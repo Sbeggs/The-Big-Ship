@@ -19,13 +19,13 @@
 #define MinObsDis 10 // distance we consider to be unsafe in cm
 #define Close 4 // What we consider too close to wall
 #define SensorSpace 10 // space between sensors
-#define TurningTime 2500 // in millisex
+#define TurningTime 50000 // in millisex
 
 //Declaring the Distance Array
 double DisArray[6];
 // DisArray is indexed as follows *0* is Forward, *1* is Forward Right, *2* is Forward Left, *3* Rear R, *4* Rear L, *5* is backwards
 char Names [8] = {'F', 'F', 'R', 'F', 'L', 'R', 'L', 'B'}; // names of Values for read outs, just for debugging
-int cnt = 0;
+unsigned int TimeOut = 0;
 
 long durationF;
 double distanceF;
@@ -59,7 +59,6 @@ void setup() {
   pinMode(EchoL, INPUT);
   pinMode(TrigB, OUTPUT);
   pinMode(EchoB, INPUT);
-  pinMode(52, OUTPUT);
   Serial.begin(9600);
 
 
@@ -127,7 +126,7 @@ void loop() {
   durationL = pulseIn(EchoL, HIGH);
 
 
-  // Filters out wack values
+  // Filters out wack values, may not need to exist
   if (durationF > WackValue) durationF = old_durationF;
   if (durationB > WackValue) durationB = old_durationB;
   if (durationFR > WackValue) durationFR = old_durationFR;
@@ -169,28 +168,27 @@ void loop() {
   DisArray[5] = distanceB;
   //delay(100);
 
-    ////  never delete this!!!!!!!!! Debugging uses Prints out array of distances for easy debugging
-    Serial.print(Names[0]);
-    Serial.print(",    ");
-    Serial.print(Names[1]);
-    Serial.print(Names[2]);
-    Serial.print(",    ");
-    Serial.print(Names[3]);
-    Serial.print(Names[4]);
-    Serial.print(",    ");
-    Serial.print(Names[5]);
-    Serial.print(",    ");
-    Serial.print(Names[6]);
-    Serial.print(",    ");
-    Serial.print(Names[7]);
-    Serial.println("");
-    for (int i = 0; i <= 5; i++) {
-      Serial.print(DisArray[i]);
-      Serial.print(", ");
-    }
-    Serial.println("");
-    Serial.println("");
-
+  ////  never delete this!!!!!!!!! Debugging uses Prints out array of distances for easy debugging
+  Serial.print(Names[0]);
+  Serial.print(",    ");
+  Serial.print(Names[1]);
+  Serial.print(Names[2]);
+  Serial.print(",    ");
+  Serial.print(Names[3]);
+  Serial.print(Names[4]);
+  Serial.print(",    ");
+  Serial.print(Names[5]);
+  Serial.print(",    ");
+  Serial.print(Names[6]);
+  Serial.print(",    ");
+  Serial.print(Names[7]);
+  Serial.println("");
+  for (int i = 0; i <= 5; i++) {
+    Serial.print(DisArray[i]);
+    Serial.print(", ");
+  }
+  Serial.println("");
+  Serial.println("");
 
 
   checkForward(DisArray); // checks forward path
@@ -219,8 +217,7 @@ void checkForward(double A[6]) {
   else {
     // stopLocomotion(); possible function that sends stop signal
     checkSides(A);
-
-    }
+  }
 
 }
 
@@ -244,10 +241,8 @@ void checkSides(double A[6]) {
   }
   else if ( A [5] >= MinObsDis) {
     // Serial.println("Going Back!");
-    //    turnRight();
-    //    delay(200); // wait for the turn to happen (maybe the uno tells us once this is done)
-    //    turnRight ();
-    //    delay(200);// wait for the turn to happen (maybe the uno tells us once this is done)
+    moveBack();
+    waitForResponse(); // wait for the turn to happen (maybe the uno tells us once this is done)
     return;
   }
 }
@@ -269,13 +264,18 @@ void turnLeft() {
   waitForResponse();
 }
 
+
+void moveBack() {
+  Serial.println("s"); // sends move back command to other guy
+  waitForResponse();
+}
+
 void checkAlign () {
   /* Function that checks allignment, looks to see if the two R sensors are within a range (small enough = close to wall),
       checks how different they are and sends value to reallign, if they are out of range we don't care
      Does the same for the left
   */
   double Difference;
-  //bool SpinRight;
   double Angle = 0;
   if (DisArray[1] < Close && DisArray[3] < Close ) {
     Difference = (DisArray[1] - DisArray [3]);
@@ -305,12 +305,13 @@ void waitForResponse() {
   // Function that waits for a response
   delay(100);
   int KylesClear = Serial.read();
-  int StartTime = millis();
   while (Serial.available() == 0) {
-    //if ((millis()-StartTime) > TurningTime)break; // waits for turning time, if matt+katherine's code blows up, this fixes us
-    }
+    //if (++TimeOut == TurningTime)break; // waits for turning time, if matt+katherine's code blows up, this resets us
+    delay(1);
+  }
   KylesClear = Serial.read();
-  //Serial.flush();
+  TimeOut = 0;
+  
 }
 
 
