@@ -19,7 +19,7 @@
 #define MinObsDis 10 // distance we consider to be unsafe in cm
 #define Close 4 // What we consider too close to wall
 #define SensorSpace 10 // space between sensors
-#define TurningTime 50000 // in millisex
+#define TurningTime 2000 // in millisex
 
 //Declaring the Distance Array
 double DisArray[6];
@@ -260,7 +260,7 @@ void turnRight() {
 }
 
 void turnLeft() {
-  Serial.println("a"); // sends turn right function to other guy
+  Serial.println("a"); // sends turn left function to other guy
   waitForResponse();
 }
 
@@ -303,15 +303,16 @@ void checkAlign () {
 
 void waitForResponse() {
   // Function that waits for a response
-  delay(100);
-  int KylesClear = Serial.read();
+  int KylesClear;
+  delay(200);
+//  KylesClear = Serial.read();
   while (Serial.available() == 0) {
-    //if (++TimeOut == TurningTime)break; // waits for turning time, if matt+katherine's code blows up, this resets us
+    if (++TimeOut == TurningTime)break; // waits for turning time, if matt+katherine's code blows up, this resets us
     delay(1);
   }
   KylesClear = Serial.read();
   TimeOut = 0;
-  
+  delay(500);
 }
 
 
