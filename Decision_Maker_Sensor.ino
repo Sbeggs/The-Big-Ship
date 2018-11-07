@@ -14,12 +14,13 @@
 
 // define various Parameters
 #define WaitForEcho 10 // how long the US sensors wait for the echo (in microseconds)
-#define WackValue 10000 // the Value above which we consider the value not real
-#define DurationCheck 10 // Check to see if old duration is different enough from current reading
-#define MinObsDis 10 // distance we consider to be unsafe in cm
-#define Close 4 // What we consider too close to wall
-#define SensorSpace 10 // space between sensors
-#define TurningTime 2000 // in millisex
+#define WackValue 100000 // the Value above which we consider the value not real
+#define DurationCheck 40 // Check to see if old duration is different enough from current reading
+#define MinObsDis 15 // distance we consider to be unsafe in cm for basic cardinal directions
+#define MinDistance 9// What we consider too close to wall for allignment
+#define sensorSeperation 5 // space between sensors
+#define TurningTime 2500 // in millisex
+#define RealignValue 1.1 // the difference between two values that triggers a re-allign
 
 //Declaring the Distance Array
 double DisArray[6];
@@ -45,6 +46,9 @@ long old_durationL = 0;
 long durationB;
 double distanceB;
 long old_durationB = 0;
+int KylesClear;
+
+double theta = 0;
 
 void setup() {
   pinMode(TrigF, OUTPUT);
@@ -61,6 +65,8 @@ void setup() {
   pinMode(EchoB, INPUT);
   Serial.begin(9600);
 
+
+  delay(3000);
 
 }
 
@@ -211,40 +217,53 @@ void checkForward(double A[6]) {
   */
   //Serial.println("Checking Forward!");
   if (A[0] >= MinObsDis) {
+    checkAlignment(); 
+    // check allignment before movement to make sure we are alligned, we want to go all the way too loop after this doe, I can't figure 
+    //out how to do it
     moveForward();
+    checkAlignment();
     return;
   }
   else {
     // stopLocomotion(); possible function that sends stop signal
     checkSides(A);
+    return;
   }
+
+  //checkAlignment(); //Check alignment and turn if need be
 
 }
 
 void checkSides(double A[6]) {
-  /* Checks to see if Right side has anything within distance, if so turn right wait for that to complete and then return to
-      measure distances again
+  /* Checks to see if Right side has anything within distance, if so turn right wait for that to complete and then check allignment
      if not check left, if left is good turn left (make three right turns) and return to read some values
-     if not turn around and go backwards (make two right turns) and return to read some distances
+     if not turn around and go backwards and return to read some distances
   */
-  //Serial.println("Checking Sides!");
+
+  //
   if (A [1] >= MinObsDis) {
-    // BackRight Should also be factored in
     turnRight();
+    checkAlignment();
     return;
 
   }
   else if (A [2] >= MinObsDis) {
     //Serial.println("Turning Left!");
     turnLeft();
+    checkAlignment();
     return;
   }
   else if ( A [5] >= MinObsDis) {
     // Serial.println("Going Back!");
+
     moveBack();
-    waitForResponse(); // wait for the turn to happen (maybe the uno tells us once this is done)
+    checkAlignment();
+
     return;
   }
+
+  //  else realignRight();
+
 }
 
 void moveForward() {
@@ -270,42 +289,104 @@ void moveBack() {
   waitForResponse();
 }
 
-void checkAlign () {
-  /* Function that checks allignment, looks to see if the two R sensors are within a range (small enough = close to wall),
-      checks how different they are and sends value to reallign, if they are out of range we don't care
-     Does the same for the left
-  */
-  double Difference;
-  double Angle = 0;
-  if (DisArray[1] < Close && DisArray[3] < Close ) {
-    Difference = (DisArray[1] - DisArray [3]);
-    if (abs(Difference) > 1.5) {
-      //if (Difference > 0) SpinRight = true;
-      //else SpinRight = false;
-      Angle = asin (Difference / SensorSpace);
-    }
-
-
-
-  }
-  else if (DisArray[2] < Close && DisArray[4] < Close) {
-    Difference = DisArray[2] - DisArray [4];
-    if (abs(Difference) > 1.5) {
-      //if (Difference > 0) SpinRight = false;
-      // else SpinRight = true;
-      Angle = asin(Difference / SensorSpace);
-    }
-
-  }
-
-  return;
+void realignRight() {
+  Serial.println("e"); // sends move back command to other guy
+  waitForResponseRealign();
 }
+
+void realignLeft() {
+  Serial.println("q"); // sends move back command to other guy
+  waitForResponseRealign();
+}
+
+void checkAlignment () {
+  /* Called before every forward movement, but turns are favoured over check allignment
+      This function checks to see if we are within range for a reallignment, if we are checks to see if we are going to be movin
+      towards or away from the slanted wall, if towards it calculates a theta value and tells us to reallign and returns to read
+      more values
+  */
+  double FR = DisArray[1];
+  double FL = DisArray[2];
+  double R = DisArray[3];
+  double L = DisArray[4];
+  //  bool cantTurnRight = FALSE;
+  //  bool cantTurnLeft = FALSE;
+
+  //  if (R < noTurnDistance) cantTurnLeft = TRUE;
+  //  if (L < noTurnDistance) cantTurnRight = TRUE;
+
+
+
+  if (FL < MinDistance || L < MinDistance) {
+    Serial.println("Left Allign");
+    //    Serial.println(L - FL);
+    theta = atan((FL - L) / sensorSeperation) * 360 / 6.28; // checks to see where we are compared to wall
+    Serial.println(theta);
+    if ((L - FL) > RealignValue) {
+
+      Serial.println("In theta if");
+      while (theta < 0) {// probably doesn't really need to exist anymore, just becomes part of our loop
+        //        Serial.println(theta);
+        realignRight();
+        delay(200);
+        return; // brings us back and we move forwards agian
+      }
+    }
+  }
+
+  else if (FR < MinDistance || R < MinDistance) {
+    Serial.println("Right Allign");
+
+    theta = atan((FR - R) / sensorSeperation) * 360 / 6.28; // checks to see where we are compared to wall
+    Serial.println(theta);
+    if ((R - FR) > RealignValue) {
+      Serial.println("In theta if");
+
+      while (theta < 0) { // probably doesn't really need to exist anymore, just becomes part of our loop
+        Serial.println(theta);
+        realignLeft();
+        return;
+        //        theta = theta + 20;
+      }
+    }
+  }
+}
+
+//void checkAlign () {
+//  /* Function that checks allignment, looks to see if the two R sensors are within a range (small enough = close to wall),
+//      checks how different they are and sends value to reallign, if they are out of range we don't care
+//     Does the same for the left
+//  */
+//  double Difference;
+//  double Angle = 0;
+//  if (DisArray[1] < Close && DisArray[3] < Close ) {
+//    Difference = (DisArray[1] - DisArray [3]);
+//    if (abs(Difference) > 1.5) {
+//      //if (Difference > 0) SpinRight = true;
+//      //else SpinRight = false;
+//      Angle = asin (Difference / SensorSpace);
+//    }
+//
+//
+//
+//  }
+//  else if (DisArray[2] < Close && DisArray[4] < Close) {
+//    Difference = DisArray[2] - DisArray [4];
+//    if (abs(Difference) > 1.5) {
+//      //if (Difference > 0) SpinRight = false;
+//      // else SpinRight = true;
+//      Angle = asin(Difference / SensorSpace);
+//    }
+//
+//  }
+//
+//  return;
+//}
 
 void waitForResponse() {
   // Function that waits for a response
-  int KylesClear;
   delay(200);
-//  KylesClear = Serial.read();
+  //  KylesClear = Serial.read();
   while (Serial.available() == 0) {
     if (++TimeOut == TurningTime)break; // waits for turning time, if matt+katherine's code blows up, this resets us
     delay(1);
@@ -315,4 +396,15 @@ void waitForResponse() {
   delay(500);
 }
 
-
+void waitForResponseRealign() {
+  // Function that waits for a response
+  delay(200);
+  //  KylesClear = Serial.read();
+  while (Serial.available() == 0) {
+    if (++TimeOut == TurningTime)break; // waits for turning time, if matt+katherine's code blows up, this resets us
+    delay(1);
+  }
+  KylesClear = Serial.read();
+  TimeOut = 0;
+  delay(500);
+}
