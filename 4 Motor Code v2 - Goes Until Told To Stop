@@ -1,0 +1,267 @@
+//--------------------------------------------------------------------------------
+// 4 MOTOR RUNNING CODE - VERSION 2 - GOES UNTIL TOLD TO STOP
+//--------------------------------------------------------------------------------
+
+//INFORMATION: --> w = forward, s = backwards, a = left, d = right
+//             --> q = shift right, e = shift left, f = shift forward, r = shift backward
+//             --> Board 1 controls forwards and backwards movement
+//             --> Board 2 controls left and right movement
+ 
+//PWM Variables
+unsigned int pwm_A1 = 230;
+unsigned int pwm_B1 = 230;
+unsigned int pwm_A2 = 230;
+unsigned int pwm_B2 = 230;
+
+//BOARD 1 - FORWARD AND BACKWARD
+int PWMpinA1 = 2;
+int PWMpinB1 = 3;
+int brakeAmotorA1 = 22;
+int brakeBmotorB1 = 23;
+int dirAmotorA1 = 24;
+int dirBmotorB1 = 25;
+
+//BOARD 2 - LEFT AND RIGHT
+int PWMpinA2 = 4;
+int PWMpinB2 = 5;
+int brakeAmotorA2 = 30;
+int brakeBmotorB2 = 31;
+int dirAmotorA2 = 32;
+int dirBmotorB2 = 33;
+
+//COMMANDS
+char start_command;
+char next_command;
+char Kyles_Clear;
+
+//SHIFT TIMES
+#define left_shift_time 100
+#define right_shift_time 100
+#define forward_shift_time 100
+#define backward_shift_time 100
+ 
+void setup() {
+  pinMode(brakeAmotorA1, OUTPUT); //Initiates motor 1 channel A brake on board 1
+  pinMode(brakeBmotorB1, OUTPUT); // Initiates motor 2 channel B brake on board 1
+ 
+  pinMode(dirAmotorA1, OUTPUT); // Initiates motor 1 dir A on board 1
+  pinMode(dirBmotorB1, OUTPUT); // Initiates motor 1 dir B on board 1
+
+  pinMode(brakeAmotorA2, OUTPUT); //Initiates motor 1 channel A brake on board 2
+  pinMode(brakeBmotorB2 , OUTPUT); // Initiates motor 2 channel B brake on board 2
+
+  pinMode(dirAmotorA2, OUTPUT); // Initiates motor 1 dir A on board 2
+  pinMode(dirBmotorB2, OUTPUT); // Initiates motor 1 dir B on board 2
+
+  //Initiate Serial Monitor
+  Serial.begin(9600);
+}
+
+
+//--------------------------------------------------------------------------------
+// TAKING IN COMMANDS LOOP
+//--------------------------------------------------------------------------------
+
+void loop() {
+  
+  if (Serial.available()>0) start_command = Serial.read(); //GET STARTING COMMAND
+
+  //MOVING FORWARDS
+  if (start_command == 'w') { 
+
+    runA1(pwm_A1, true);
+    runB1(pwm_B1, false);
+
+    if (Serial.available()>0) next_command = Serial.read(); //GET NEXT COMMAND
+    
+    while (next_command != 'z') { //SHIFT IF NEEDED UNTIL ITS TIME TO STOP
+      if (next_command == 'q') shiftLeft();
+      else if (next_command == 'e') shiftRight();
+
+      next_command = "n"; //Neutral Command to do nothing
+      if (Serial.available()>0) next_command = Serial.read();
+    }
+  
+    board1stop(); //STOP MOVING
+    start_command = "n";
+    next_command = "n";
+  }
+
+  //MOVING BACKWARDS
+  else if (start_command == 's') { 
+
+    runA1(pwm_A1, false);
+    runB1(pwm_B1, true);
+
+    if (Serial.available()>0) next_command = Serial.read();
+    
+    while (next_command != 'z') {
+      if (next_command == 'q') shiftLeft();
+      else if (next_command == 'e') shiftRight();
+
+      next_command = "n"; //Neutral Command to do nothing
+      if (Serial.available()>0) next_command = Serial.read();
+    }
+  
+    board1stop();
+    start_command = "n";
+    next_command = "n";
+  }
+
+  //MOVING RIGHT
+  else if (start_command == 'd') { 
+
+    runA2(pwm_A2, false);
+    runB2(pwm_B2, true);
+
+    if (Serial.available()>0) next_command = Serial.read();
+    
+    while (next_command != 'z') {
+      if (next_command == 'f') shiftForward(); //SHIFT FORWARD
+      else if (next_command == 'r') shiftBackward(); //SHIFT REVERSE
+
+      next_command = "n"; //Neutral Command to do nothing
+      if (Serial.available()>0) next_command = Serial.read();
+    }
+  
+    board2stop();
+    start_command = "n";
+    next_command = "n";
+  }
+
+  //MOVING LEFT
+  else if (start_command == 'a') { 
+
+    runA2(pwm_A2, true);
+    runB2(pwm_B2, false);
+
+    if (Serial.available()>0) next_command = Serial.read();
+    
+    while (next_command != 'z') {
+      if (next_command == 'f') shiftForward(); //SHIFT FORWARD
+      else if (next_command == 'r') shiftBackward(); //SHIFT REVERSE
+
+      next_command = "n"; //Neutral Command to do nothing
+      if (Serial.available()>0) next_command = Serial.read();
+    }
+  
+    board2stop();
+    start_command = "n";
+    next_command = "n";
+  }
+
+ // Kyles_Clear = Serial.read();
+}
+
+
+//--------------------------------------------------------------------------------
+// MOTOR RUN CODE - MOTORS ON BOARD 1 - FORWARD AND BACKWARD
+//--------------------------------------------------------------------------------
+
+void runA1(int speed, boolean rev) {
+  //Channel A
+  if(rev) digitalWrite(dirAmotorA1, LOW);
+  else digitalWrite(dirAmotorA1, HIGH); 
+  
+  digitalWrite(brakeAmotorA1, LOW);   //Disengage the Brake for Channel A
+  analogWrite(PWMpinA1, speed);   //Spins the motor on Channel A at full speed
+}  
+
+void runB1(int speed, boolean rev) {
+  if(rev) digitalWrite(dirBmotorB1, LOW);
+  else digitalWrite(dirBmotorB1, HIGH); 
+
+  digitalWrite(brakeBmotorB1, LOW);   //Disengage the Brake for Channel A
+  analogWrite(PWMpinB1, speed);   //Spins the motor on Channel A at full speed
+}  
+
+
+//--------------------------------------------------------------------------------
+// MOTOR RUN CODE - MOTORS ON BOARD 2 - LEFT AND RIGHT
+// --------------------------------------------------------------------------------
+
+void runA2(int speed, boolean rev) {
+  if(rev) digitalWrite(dirAmotorA2, LOW); 
+  else digitalWrite(dirAmotorA2, HIGH); 
+   
+  digitalWrite(brakeAmotorA2, LOW);   //Disengage the Brake for Channel B
+  analogWrite(PWMpinA2, speed);   //Spins the motor on Channel B at full speed 
+}
+
+
+void runB2(int speed, boolean rev) {
+  if(rev) digitalWrite(dirBmotorB2, LOW);
+  else digitalWrite(dirBmotorB2, HIGH);
+   
+  digitalWrite(brakeBmotorB2, LOW);   //Disengage the Brake for Channel B
+  analogWrite(PWMpinB2, speed);   //Spins the motor on Channel B at full speed 
+}
+
+
+//--------------------------------------------------------------------------------
+// STOPPING FUNCTIONS
+//--------------------------------------------------------------------------------
+
+//BOARD 1 STOPPING FUNCTIONS - FORWARDS AND BACKWARDS
+void board1stop(){
+  digitalWrite(brakeAmotorA1, HIGH);
+  digitalWrite(brakeBmotorB1, HIGH);
+
+  runA1(0,true);
+  runB1(0,true);
+}
+
+//BOARD 2 STOPPING FUNCTIONS - LEFT AND RIGHT
+void board2stop(){
+  digitalWrite(brakeAmotorA2, HIGH);
+  digitalWrite(brakeBmotorB2, HIGH);
+
+  runA2(0,true);
+  runB2(0,true);
+}
+
+
+//--------------------------------------------------------------------------------
+// SHIFTING FUNCTIONS
+//--------------------------------------------------------------------------------
+
+void shiftLeft(){
+      runA2(pwm_A2, true);
+      runB2(pwm_B2, false);
+      delay(left_shift_time);
+      board2stop();
+}
+
+void shiftRight(){
+      runA2(pwm_A2, false);
+      runB2(pwm_B2, true);
+      delay(right_shift_time);
+      board2stop();
+}
+
+void shiftForward(){
+      runA1(pwm_A1, true);
+      runB1(pwm_B1, false);
+      delay(forward_shift_time);
+      board1stop();
+}
+
+void shiftBackward(){
+      runA1(pwm_A1, false);
+      runB1(pwm_B1, true);
+      delay(backward_shift_time);
+      board1stop(); 
+}
+
+
+//--------------------------------------------------------------------------------
+// ARCHIVED CODE
+//--------------------------------------------------------------------------------
+
+////time in millis to execute each of the drive functions for 13.3V battery
+//#define left_turning_time 650 
+//#define right_turning_time 700
+//#define forwards_time 500
+//#define backwards_time 500
+//#define right_align_time 90
+//#define left_align_time 90
